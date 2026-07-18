@@ -207,39 +207,42 @@ async fn handle_login(
     LoginForm(req): LoginForm,
 ) -> Result<Json<LoginResponse>, (StatusCode, Json<ErrorResponse>)> {
     let username = req.username.as_deref().unwrap_or("");
-    let password = req.password.as_deref().unwrap_or("");
+    let grant_type = req.grant_type.as_deref().unwrap_or("password");
 
-    let account = state
-        .db
-        .get_account_by_email(username)
-        .map_err(|_| {
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ErrorResponse {
-                    error: "db_error".to_string(),
-                    error_description: "Database error".to_string(),
-                }),
-            )
+    let account = if grant_type == "refresh_token" {
+        let rt = req.refresh_token.as_deref().unwrap_or("");
+        state.db.get_account_by_refresh_token(rt).map_err(|_| {
+            (StatusCode::INTERNAL_SERVER_ERROR, Json(ErrorResponse {
+                error: "db_error".to_string(),
+                error_description: "Database error".to_string(),
+            }))
+        })?.ok_or_else(|| {
+            (StatusCode::BAD_REQUEST, Json(ErrorResponse {
+                error: "invalid_grant".to_string(),
+                error_description: "Invalid refresh token".to_string(),
+            }))
         })?
-        .ok_or_else(|| {
-            (
-                StatusCode::BAD_REQUEST,
-                Json(ErrorResponse {
-                    error: "invalid_grant".to_string(),
-                    error_description: "Username or password is incorrect".to_string(),
-                }),
-            )
-        })?;
-
-    if password != account.master_password_hash {
-        return Err((
-            StatusCode::BAD_REQUEST,
-            Json(ErrorResponse {
+    } else {
+        let password = req.password.as_deref().unwrap_or("");
+        let account = state.db.get_account_by_email(username).map_err(|_| {
+            (StatusCode::INTERNAL_SERVER_ERROR, Json(ErrorResponse {
+                error: "db_error".to_string(),
+                error_description: "Database error".to_string(),
+            }))
+        })?.ok_or_else(|| {
+            (StatusCode::BAD_REQUEST, Json(ErrorResponse {
                 error: "invalid_grant".to_string(),
                 error_description: "Username or password is incorrect".to_string(),
-            }),
-        ));
-    }
+            }))
+        })?;
+        if password != account.master_password_hash {
+            return Err((StatusCode::BAD_REQUEST, Json(ErrorResponse {
+                error: "invalid_grant".to_string(),
+                error_description: "Username or password is incorrect".to_string(),
+            })));
+        }
+        account
+    };
 
     let access_token = create_token(&account.id, &account.email, &state.jwt_secret).map_err(|_| {
         (

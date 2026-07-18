@@ -226,6 +226,36 @@ impl Database {
         }
     }
 
+    pub fn get_account_by_refresh_token(&self, token: &str) -> SqlResult<Option<Account>> {
+        let c = self.conn.lock().unwrap();
+        let mut stmt = c.prepare(
+            "SELECT id, name, email, master_password_hash, master_password_hint, key,
+             private_key, public_key, refresh_token, two_factor_secret, security_stamp, kdf, kdf_iterations
+             FROM accounts WHERE refresh_token = ?1",
+        )?;
+        let mut rows = stmt.query(params![token])?;
+        match rows.next()? {
+            Some(row) => Ok(Some(Account {
+                id: row.get(0)?,
+                name: row.get(1)?,
+                email: row.get(2)?,
+                master_password_hash: row.get(3)?,
+                master_password_hint: row.get(4)?,
+                key: row.get(5)?,
+                keys: KeyPair {
+                    encrypted_private_key: row.get(6)?,
+                    public_key: row.get(7)?,
+                },
+                refresh_token: row.get(8)?,
+                two_factor_secret: row.get(9)?,
+                security_stamp: row.get(10)?,
+                kdf: row.get(11)?,
+                kdf_iterations: row.get(12)?,
+            })),
+            None => Ok(None),
+        }
+    }
+
     pub fn update_refresh_token(&self, id: &str, new_token: &str) -> SqlResult<()> {
         let c = self.conn.lock().unwrap();
         c.execute(
