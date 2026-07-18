@@ -62,11 +62,15 @@ async fn main() {
         .route("/", get(health_check))
         // Public API routes (no auth required)
         .merge(api::auth::routes())
+        // Admin panel (public but needs basic auth)
+        .merge(api::admin::routes())
         // Protected API routes with auth middleware
         .merge(
             Router::new()
                 .merge(api::ciphers::routes())
                 .merge(api::folders::routes())
+                .merge(api::orgs::routes())
+                .merge(api::sends::routes())
                 .merge(api::sync::routes())
                 .layer(middleware::from_fn_with_state(
                     state.clone(),

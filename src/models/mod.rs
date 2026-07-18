@@ -122,6 +122,8 @@ pub struct Cipher {
     pub organization_use_totp: bool,
     #[serde(rename = "revisionDate", default)]
     pub revision_date: String,
+    #[serde(rename = "deletedDate", default, skip_serializing_if = "Option::is_none")]
+    pub deleted_date: Option<String>,
     #[serde(default)]
     pub object: String,
     #[serde(rename = "collectionIds", default)]
@@ -307,4 +309,106 @@ pub struct KeysUpdateRequest {
     pub encrypted_private_key: String,
     #[serde(rename = "publicKey")]
     pub public_key: String,
+}
+
+// ===================== Organization =====================
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Organization {
+    pub id: String,
+    pub name: String,
+    #[serde(rename = "billingEmail")]
+    pub billing_email: String,
+    pub plan: String,
+    #[serde(rename = "planType")]
+    pub plan_type: i32,
+    pub enabled: bool,
+    pub object: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OrganizationCreateRequest {
+    pub name: String,
+    #[serde(rename = "billingEmail")]
+    pub billing_email: String,
+}
+
+// ===================== Collection =====================
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Collection {
+    pub id: String,
+    pub name: String,
+    #[serde(rename = "organizationId")]
+    pub organization_id: Option<String>,
+    pub object: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CollectionCreateRequest {
+    pub name: String,
+    #[serde(rename = "organizationId")]
+    pub organization_id: String,
+}
+
+// ===================== Send =====================
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Send {
+    pub id: String,
+    pub name: String,
+    #[serde(rename = "nameEncrypted")]
+    pub name_encrypted: bool,
+    pub text: Option<String>,
+    #[serde(rename = "textEncrypted")]
+    pub text_encrypted: bool,
+    pub file: Option<SendFile>,
+    #[serde(rename = "maxAccessCount")]
+    pub max_access_count: Option<i32>,
+    #[serde(rename = "accessCount")]
+    pub access_count: i32,
+    #[serde(rename = "revisionDate")]
+    pub revision_date: String,
+    #[serde(rename = "expirationDate")]
+    pub expiration_date: Option<String>,
+    #[serde(rename = "deletionDate")]
+    pub deletion_date: Option<String>,
+    pub password: Option<String>,
+    pub disabled: bool,
+    #[serde(rename = "hideEmail")]
+    pub hide_email: bool,
+    pub object: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SendFile {
+    pub data: String,
+    pub encrypted: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SendCreateRequest {
+    pub name: String,
+    pub text: Option<String>,
+    pub file: Option<SendFile>,
+    #[serde(rename = "maxAccessCount")]
+    pub max_access_count: Option<i32>,
+    #[serde(rename = "expirationDate")]
+    pub expiration_date: Option<String>,
+    #[serde(rename = "deletionDate")]
+    pub deletion_date: Option<String>,
+    pub password: Option<String>,
+    pub disabled: bool,
+    #[serde(rename = "hideEmail")]
+    pub hide_email: bool,
+}
+
+// ===================== Admin =====================
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AdminDashboard {
+    pub user_count: i64,
+    pub db_size: i64,
+    pub server_version: String,
+    pub uptime: String,
 }

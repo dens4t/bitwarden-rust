@@ -1,7 +1,12 @@
+pub mod admin;
 pub mod auth;
 pub mod ciphers;
 pub mod folders;
+pub mod orgs;
+pub mod sends;
 pub mod sync;
+
+use std::marker::Send as SendTrait;
 
 use axum::{
     extract::{FromRequestParts, Request},
@@ -74,7 +79,7 @@ pub fn validate_token(
 #[derive(Debug, Clone)]
 pub struct UserId(pub String);
 
-impl<S: Send + Sync> FromRequestParts<S> for UserId {
+impl<S: SendTrait + Sync> FromRequestParts<S> for UserId {
     type Rejection = (StatusCode, Json<ErrorResponse>);
 
     async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
