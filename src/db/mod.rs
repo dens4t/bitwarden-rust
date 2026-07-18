@@ -33,6 +33,7 @@ impl Database {
                 two_factor_secret   TEXT NOT NULL DEFAULT '',
                 kdf                 INTEGER NOT NULL DEFAULT 0,
                 kdf_iterations      INTEGER NOT NULL DEFAULT 600000,
+                security_stamp      TEXT NOT NULL DEFAULT '',
                 created_at          TEXT NOT NULL DEFAULT (datetime('now'))
             );
 
@@ -105,8 +106,9 @@ impl Database {
             ",
         )?;
 
-        // Migrate: add deleted_date if not exists (safe to run multiple times)
+        // Migrate: add columns that might not exist in older DBs
         c.execute("ALTER TABLE ciphers ADD COLUMN deleted_date TEXT", []).ok();
+        c.execute("ALTER TABLE accounts ADD COLUMN security_stamp TEXT NOT NULL DEFAULT ''", []).ok();
         Ok(())
     }
 
@@ -134,12 +136,13 @@ impl Database {
         let c = self.conn.lock().unwrap();
         let id = Uuid::new_v4().to_string();
         let refresh_token = crate::crypto::generate_token();
+        let security_stamp = Uuid::new_v4().to_string();
 
         c.execute(
             "INSERT INTO accounts (id, name, email, master_password_hash, master_password_hint,
-             key, private_key, public_key, refresh_token, kdf, kdf_iterations)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
-            params![id, name, email, password_hash, password_hint, key, private_key, public_key, refresh_token, kdf, kdf_iterations],
+             key, private_key, public_key, refresh_token, security_stamp, kdf, kdf_iterations)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
+            params![id, name, email, password_hash, password_hint, key, private_key, public_key, refresh_token, security_stamp, kdf, kdf_iterations],
         )?;
 
         Ok(Account {
@@ -155,6 +158,7 @@ impl Database {
             },
             refresh_token,
             two_factor_secret: String::new(),
+            security_stamp,
             kdf,
             kdf_iterations,
         })
@@ -164,7 +168,7 @@ impl Database {
         let c = self.conn.lock().unwrap();
         let mut stmt = c.prepare(
             "SELECT id, name, email, master_password_hash, master_password_hint, key,
-             private_key, public_key, refresh_token, two_factor_secret, kdf, kdf_iterations
+             private_key, public_key, refresh_token, two_factor_secret, security_stamp, kdf, kdf_iterations
              FROM accounts WHERE email = ?1",
         )?;
 
@@ -183,8 +187,9 @@ impl Database {
                 },
                 refresh_token: row.get(8)?,
                 two_factor_secret: row.get(9)?,
-                kdf: row.get(10)?,
-                kdf_iterations: row.get(11)?,
+                security_stamp: row.get(10)?,
+                kdf: row.get(11)?,
+                kdf_iterations: row.get(12)?,
             })),
             None => Ok(None),
         }
@@ -194,7 +199,7 @@ impl Database {
         let c = self.conn.lock().unwrap();
         let mut stmt = c.prepare(
             "SELECT id, name, email, master_password_hash, master_password_hint, key,
-             private_key, public_key, refresh_token, two_factor_secret, kdf, kdf_iterations
+             private_key, public_key, refresh_token, two_factor_secret, security_stamp, kdf, kdf_iterations
              FROM accounts WHERE id = ?1",
         )?;
 
@@ -213,8 +218,9 @@ impl Database {
                 },
                 refresh_token: row.get(8)?,
                 two_factor_secret: row.get(9)?,
-                kdf: row.get(10)?,
-                kdf_iterations: row.get(11)?,
+                security_stamp: row.get(10)?,
+                kdf: row.get(11)?,
+                kdf_iterations: row.get(12)?,
             })),
             None => Ok(None),
         }
@@ -711,7 +717,7 @@ impl Database {
         let c = self.conn.lock().unwrap();
         let mut stmt = c.prepare(
             "SELECT id, name, email, master_password_hash, master_password_hint, key,
-             private_key, public_key, refresh_token, two_factor_secret, kdf, kdf_iterations
+             private_key, public_key, refresh_token, two_factor_secret, security_stamp, kdf, kdf_iterations
              FROM accounts ORDER BY created_at DESC",
         )?;
 
@@ -729,8 +735,9 @@ impl Database {
                 },
                 refresh_token: row.get(8)?,
                 two_factor_secret: row.get(9)?,
-                kdf: row.get(10)?,
-                kdf_iterations: row.get(11)?,
+                security_stamp: row.get(10)?,
+                kdf: row.get(11)?,
+                kdf_iterations: row.get(12)?,
             })
         })?;
 

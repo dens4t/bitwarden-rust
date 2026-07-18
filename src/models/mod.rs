@@ -25,6 +25,7 @@ pub struct Account {
     pub refresh_token: String,
     #[serde(skip)]
     pub two_factor_secret: String,
+    pub security_stamp: String,
     pub kdf: i32,
     #[serde(rename = "kdfIterations")]
     pub kdf_iterations: i32,
@@ -64,7 +65,11 @@ impl From<Account> for Profile {
             two_factor_enabled: !acc.two_factor_secret.is_empty(),
             key: acc.key,
             private_key: acc.keys.encrypted_private_key,
-            security_stamp: None,
+            security_stamp: if acc.security_stamp.is_empty() {
+                None
+            } else {
+                Some(acc.security_stamp.clone())
+            },
             organizations: vec![],
             object: "profile".to_string(),
             master_password_hint: if acc.master_password_hint.is_empty() {

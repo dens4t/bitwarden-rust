@@ -3,12 +3,13 @@ mod crypto;
 mod db;
 mod models;
 
-use api::{auth_middleware, AppState};
-use axum::{middleware, routing::get, Router};
+use api::{auth_middleware, AppState, SharedState};
+use axum::{extract::Request, middleware, response::IntoResponse, routing::get, Json, Router};
 use std::path::Path;
 use std::sync::Arc;
-use tower_http::cors::CorsLayer;
 use tower_http::trace::TraceLayer;
+use tower_http::cors::CorsLayer;
+
 
 #[tokio::main]
 async fn main() {
@@ -86,6 +87,8 @@ async fn main() {
                     auth_middleware,
                 )),
         )
+        // Fallback – log all unhandled requests
+        .fallback(fallback_handler)
         // Layers
         .layer(CorsLayer::permissive())
         .layer(TraceLayer::new_for_http())
@@ -99,6 +102,15 @@ async fn main() {
     axum::serve(listener, app)
         .await
         .expect("Server failed");
+}
+
+/// Catch-all fallback – logs unknown requests, returns 200 to avoid extension errors
+async fn fallback_handler(req: Request) -> impl IntoResponse {
+    log::warn!("❓ UNHANDLED {} {}", req.method(), req.uri());
+    (
+        axum::http::StatusCode::OK,
+        Json(serde_json::json!({})),
+    )
 }
 
 /// GET / - Health check

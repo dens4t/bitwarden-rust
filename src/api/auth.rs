@@ -1,7 +1,7 @@
 use axum::{
     extract::{FromRequest, Request, State},
     http::{header::CONTENT_TYPE, StatusCode},
-    routing::{get, post},
+    routing::{any, get, post},
     Json, Router,
 };
 
@@ -23,11 +23,18 @@ pub fn routes() -> Router<SharedState> {
         .route("/identity/accounts/register/finish", post(handle_identity_register))
         .route("/identity/accounts/register/send-verification-email", post(handle_send_verification_email))
         // Stubs for extension compatibility
-        .route("/api/config", get(handle_stub_empty))
-        .route("/api/devices", get(handle_stub_devices).post(handle_stub_devices))
-        .route("/api/accounts/security-stamp", post(handle_stub_empty))
-        .route("/SDK/webLanguage", get(handle_stub_empty))
-        .route("/SDK/{*rest}", get(handle_stub_empty))
+        .route("/api/config", any(handle_stub_empty))
+        .route("/api/devices", get(handle_stub_devices).post(handle_stub_create_device))
+        .route("/api/accounts/security-stamp", any(handle_stub_security_stamp))
+        .route("/api/accounts/account", any(handle_stub_empty))
+        .route("/api/accounts/account/profile", any(handle_stub_empty))
+        .route("/api/accounts/account/keys", any(handle_stub_empty))
+        .route("/api/accounts/account/security-stamp", any(handle_stub_empty))
+        .route("/SDK/webLanguage", any(handle_stub_empty))
+        .route("/SDK/{*rest}", any(handle_stub_empty))
+        .route("/alive", any(handle_stub_empty))
+        .route("/version.json", any(handle_stub_empty))
+        .route("/app/version.json", any(handle_stub_empty))
         // 2FA
         .route("/api/two-factor/get-authenticator", post(handle_get_authenticator))
         .route("/api/two-factor/authenticator", post(handle_verify_authenticator))
@@ -120,6 +127,23 @@ async fn handle_stub_empty() -> Json<serde_json::Value> {
 
 async fn handle_stub_devices() -> Json<serde_json::Value> {
     Json(serde_json::json!([]))
+}
+
+async fn handle_stub_create_device() -> Json<serde_json::Value> {
+    let id = uuid::Uuid::new_v4().to_string();
+    Json(serde_json::json!({
+        "id": id,
+        "name": "Chrome extension",
+        "identifier": id,
+        "type": 2,
+        "status": "valid",
+        "creationDate": "2026-01-01T00:00:00.000Z",
+        "object": "device"
+    }))
+}
+
+async fn handle_stub_security_stamp() -> Json<serde_json::Value> {
+    Json(serde_json::json!({"securityStamp": uuid::Uuid::new_v4().to_string()}))
 }
 
 // ── Login – accepts both JSON and form-urlencoded ─────────────
