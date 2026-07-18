@@ -113,6 +113,24 @@ impl Database {
     // ==================== Account Operations ====================
 
     pub fn create_account(&self, req: &RegisterRequest) -> SqlResult<Account> {
+        self.create_account_ext(
+            &req.email,
+            &req.name.clone().unwrap_or_default(),
+            &req.resolved_hash(),
+            &req.master_password_hint.clone().unwrap_or_default(),
+            &req.resolved_key(),
+            &req.keys.as_ref().map(|k| k.encrypted_private_key.clone()).unwrap_or_default(),
+            &req.keys.as_ref().map(|k| k.public_key.clone()).unwrap_or_default(),
+            req.resolved_kdf(),
+            req.resolved_kdf_iterations(),
+        )
+    }
+
+    pub fn create_account_ext(
+        &self, email: &str, name: &str, password_hash: &str, password_hint: &str,
+        key: &str, private_key: &str, public_key: &str,
+        kdf: i32, kdf_iterations: i32,
+    ) -> SqlResult<Account> {
         let c = self.conn.lock().unwrap();
         let id = Uuid::new_v4().to_string();
         let refresh_token = crate::crypto::generate_token();
@@ -121,29 +139,24 @@ impl Database {
             "INSERT INTO accounts (id, name, email, master_password_hash, master_password_hint,
              key, private_key, public_key, refresh_token, kdf, kdf_iterations)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
-            params![
-                id, req.name, req.email, req.master_password_hash,
-                req.master_password_hint, req.key,
-                req.keys.encrypted_private_key, req.keys.public_key,
-                refresh_token, req.kdf, req.kdf_iterations,
-            ],
+            params![id, name, email, password_hash, password_hint, key, private_key, public_key, refresh_token, kdf, kdf_iterations],
         )?;
 
         Ok(Account {
             id,
-            name: req.name.clone(),
-            email: req.email.clone(),
-            master_password_hash: req.master_password_hash.clone(),
-            master_password_hint: req.master_password_hint.clone(),
-            key: req.key.clone(),
+            name: name.to_string(),
+            email: email.to_string(),
+            master_password_hash: password_hash.to_string(),
+            master_password_hint: password_hint.to_string(),
+            key: key.to_string(),
             keys: KeyPair {
-                encrypted_private_key: req.keys.encrypted_private_key.clone(),
-                public_key: req.keys.public_key.clone(),
+                encrypted_private_key: private_key.to_string(),
+                public_key: public_key.to_string(),
             },
             refresh_token,
             two_factor_secret: String::new(),
-            kdf: req.kdf,
-            kdf_iterations: req.kdf_iterations,
+            kdf,
+            kdf_iterations,
         })
     }
 

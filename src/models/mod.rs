@@ -217,45 +217,129 @@ pub struct PreloginResponse {
     pub kdf_iterations: i32,
 }
 
+// ===================== Register – Dual Format =====================
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RegisterRequest {
-    pub name: String,
-    pub email: String,
-    #[serde(rename = "masterPasswordHash")]
-    pub master_password_hash: String,
-    #[serde(rename = "masterPasswordHint")]
-    pub master_password_hint: String,
-    pub key: String,
-    pub keys: KeyPair,
+pub struct KdfParams {
+    #[serde(alias = "kdfType")]
     pub kdf: i32,
-    #[serde(rename = "kdfIterations")]
+    #[serde(rename = "kdfIterations", alias = "iterations")]
     pub kdf_iterations: i32,
+    pub memory: Option<i32>,
+    pub parallelism: Option<i32>,
+}
+
+/// New register format: masterPasswordAuthentication + masterPasswordUnlock
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MasterPasswordAuth {
+    pub kdf: KdfParams,
+    pub salt: String,
+    #[serde(alias = "masterPasswordAuthenticationHash")]
+    pub hash: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MasterPasswordUnlock {
+    pub kdf: KdfParams,
+    pub salt: String,
+    #[serde(alias = "masterKeyWrappedUserKey")]
+    pub key: String,
+}
+
+/// Accepts both old flat format and new nested format.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RegisterRequest {
+    pub email: String,
+    pub name: Option<String>,
+    pub keys: Option<KeyPair>,
+    #[serde(rename = "masterPasswordHint")]
+    pub master_password_hint: Option<String>,
+
+    // Old flat fields
+    #[serde(rename = "masterPasswordHash")]
+    pub master_password_hash: Option<String>,
+    #[serde(alias = "userSymmetricKey")]
+    pub key: Option<String>,
+    pub kdf: Option<i32>,
+    #[serde(rename = "kdfIterations")]
+    pub kdf_iterations: Option<i32>,
+
+    // New nested fields
+    #[serde(rename = "masterPasswordAuthentication")]
+    pub master_password_authentication: Option<MasterPasswordAuth>,
+    #[serde(rename = "masterPasswordUnlock")]
+    pub master_password_unlock: Option<MasterPasswordUnlock>,
+
+    // Org invite / email verification
+    pub organization_user_id: Option<String>,
+    pub email_verification_token: Option<String>,
+    #[serde(alias = "token")]
+    pub org_invite_token: Option<String>,
+}
+
+impl RegisterRequest {
+    pub fn resolved_hash(&self) -> String {
+        if let Some(ref auth) = self.master_password_authentication {
+            auth.hash.clone()
+        } else {
+            self.master_password_hash.clone().unwrap_or_default()
+        }
+    }
+    pub fn resolved_key(&self) -> String {
+        if let Some(ref unlock) = self.master_password_unlock {
+            unlock.key.clone()
+        } else {
+            self.key.clone().unwrap_or_default()
+        }
+    }
+    pub fn resolved_kdf(&self) -> i32 {
+        if let Some(ref auth) = self.master_password_authentication {
+            auth.kdf.kdf
+        } else {
+            self.kdf.unwrap_or(0)
+        }
+    }
+    pub fn resolved_kdf_iterations(&self) -> i32 {
+        if let Some(ref auth) = self.master_password_authentication {
+            auth.kdf.kdf_iterations
+        } else {
+            self.kdf_iterations.unwrap_or(600_000)
+        }
+    }
+}
+
+// ===================== Login / Identity =====================
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LoginRequest {
-    pub username: String,
-    pub password: String,
+    pub username: Option<String>,
+    pub password: Option<String>,
     #[serde(default)]
     pub grant_type: Option<String>,
     #[serde(default)]
     pub scope: Option<String>,
     #[serde(default)]
     pub client_id: Option<String>,
+    #[serde(default, rename = "client_secret")]
+    pub client_secret: Option<String>,
     #[serde(default, rename = "deviceType")]
     pub device_type: Option<i32>,
     #[serde(default, rename = "deviceIdentifier")]
     pub device_identifier: Option<String>,
     #[serde(default, rename = "deviceName")]
     pub device_name: Option<String>,
-    #[serde(default, rename = "pushToken")]
-    pub push_token: Option<String>,
+    #[serde(default, rename = "devicePushToken")]
+    pub device_push_token: Option<String>,
+    #[serde(default, rename = "refresh_token")]
+    pub refresh_token: Option<String>,
     #[serde(default, rename = "twoFactorToken")]
     pub two_factor_token: Option<String>,
     #[serde(default, rename = "twoFactorProvider")]
     pub two_factor_provider: Option<i32>,
-    #[serde(default, rename = "authRequestToken")]
-    pub auth_request_token: Option<String>,
+    #[serde(default, rename = "twoFactorRemember")]
+    pub two_factor_remember: Option<i32>,
+    #[serde(default)]
+    pub auth_request: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -273,6 +357,10 @@ pub struct LoginResponse {
     pub kdf: Option<i32>,
     #[serde(rename = "KdfIterations")]
     pub kdf_iterations: Option<i32>,
+    #[serde(rename = "KdfMemory")]
+    pub kdf_memory: Option<i32>,
+    #[serde(rename = "KdfParallelism")]
+    pub kdf_parallelism: Option<i32>,
     #[serde(rename = "twoFactorToken")]
     pub two_factor_token: Option<String>,
     pub object: String,
