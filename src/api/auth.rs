@@ -1,9 +1,11 @@
 use axum::{
-    extract::State,
-    http::StatusCode,
+    extract::{FromRequest, Request, State},
+    http::{header::CONTENT_TYPE, StatusCode},
     routing::{get, post},
-    Form, Json, Router,
+    Json, Router,
 };
+
+use std::marker::Send as SendTrait;
 
 use crate::api::{create_token, SharedState, UserId};
 use crate::crypto;
@@ -20,6 +22,12 @@ pub fn routes() -> Router<SharedState> {
         .route("/identity/accounts/register", post(handle_identity_register))
         .route("/identity/accounts/register/finish", post(handle_identity_register))
         .route("/identity/accounts/register/send-verification-email", post(handle_send_verification_email))
+        // Stubs for extension compatibility
+        .route("/api/config", get(handle_stub_empty))
+        .route("/api/devices", get(handle_stub_devices).post(handle_stub_devices))
+        .route("/api/accounts/security-stamp", post(handle_stub_empty))
+        .route("/SDK/webLanguage", get(handle_stub_empty))
+        .route("/SDK/{*rest}", get(handle_stub_empty))
         // 2FA
         .route("/api/two-factor/get-authenticator", post(handle_get_authenticator))
         .route("/api/two-factor/authenticator", post(handle_verify_authenticator))
@@ -43,7 +51,6 @@ async fn handle_prelogin(
 // ── Register ──────────────────────────────────────────────────
 
 async fn handle_send_verification_email() -> &'static str {
-    // Stub: 204 No Content
     ""
 }
 
@@ -79,7 +86,6 @@ async fn do_register(
         ));
     }
 
-    // Build account from request (handles both old & new format)
     let account = state.db.create_account_ext(
         &email,
         &req.name.clone().unwrap_or_default(),
@@ -106,11 +112,75 @@ async fn do_register(
     })))
 }
 
-// ── Login ─────────────────────────────────────────────────────
+// ── Stub handlers for extension compatibility ────────────────
 
+async fn handle_stub_empty() -> Json<serde_json::Value> {
+    Json(serde_json::json!({}))
+}
+
+async fn handle_stub_devices() -> Json<serde_json::Value> {
+    Json(serde_json::json!([]))
+}
+
+// ── Login – accepts both JSON and form-urlencoded ─────────────
+
+struct LoginForm(pub LoginRequest);
+
+impl<S: SendTrait + Sync> FromRequest<S> for LoginForm {
+    type Rejection = (StatusCode, Json<ErrorResponse>);
+
+    async fn from_request(req: Request, state: &S) -> Result<Self, Self::Rejection> {
+        let (parts, body) = req.into_parts();
+        let content_type = parts
+            .headers
+            .get(CONTENT_TYPE)
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or("")
+            .to_string();
+
+        let bytes = axum::body::Bytes::from_request(Request::from_parts(parts, body), state)
+            .await
+            .map_err(|_| {
+                (
+                    StatusCode::BAD_REQUEST,
+                    Json(ErrorResponse {
+                        error: "invalid_request".to_string(),
+                        error_description: "Failed to read request body".to_string(),
+                    }),
+                )
+            })?;
+
+        if content_type.starts_with("application/json") {
+            let login: LoginRequest = serde_json::from_slice(&bytes).map_err(|e| {
+                (
+                    StatusCode::BAD_REQUEST,
+                    Json(ErrorResponse {
+                        error: "invalid_json".to_string(),
+                        error_description: format!("Invalid JSON: {}", e),
+                    }),
+                )
+            })?;
+            Ok(LoginForm(login))
+        } else {
+            let str_body = String::from_utf8_lossy(&bytes);
+            let login: LoginRequest = serde_urlencoded::from_str(&str_body).map_err(|e| {
+                (
+                    StatusCode::BAD_REQUEST,
+                    Json(ErrorResponse {
+                        error: "invalid_form".to_string(),
+                        error_description: format!("Invalid form data: {}", e),
+                    }),
+                )
+            })?;
+            Ok(LoginForm(login))
+        }
+    }
+}
+
+/// POST /identity/connect/token
 async fn handle_login(
     State(state): State<SharedState>,
-    Form(req): Form<LoginRequest>,
+    LoginForm(req): LoginForm,
 ) -> Result<Json<LoginResponse>, (StatusCode, Json<ErrorResponse>)> {
     let username = req.username.as_deref().unwrap_or("");
     let password = req.password.as_deref().unwrap_or("");
