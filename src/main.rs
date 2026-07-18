@@ -18,24 +18,37 @@ async fn main() {
     // Priority: CLI args > Environment vars > Defaults
     let args: Vec<String> = std::env::args().collect();
 
-    // Database path: arg[1] atau env DB_PATH atau default
-    let db_path = parse_arg(&args, 1)
+    // Handle --help
+    if args.contains(&"--help".to_string()) || args.contains(&"-h".to_string()) {
+        println!("Usage: bitwarden-rs [db_path] [bind_addr] [jwt_secret]");
+        println!("Environment variables: DB_PATH, HOST, PORT, BIND_ADDR, JWT_SECRET");
+        return;
+    }
+
+    // Helper: skip flags when parsing positional args
+    fn positional_arg(args: &[String], pos: usize) -> Option<String> {
+        let non_flags: Vec<&String> = args.iter().filter(|a| !a.starts_with('-')).collect();
+        non_flags.get(pos).map(|s| s.to_string())
+    }
+
+    // Database path: pos arg[1] atau env DB_PATH atau default
+    let db_path = positional_arg(&args, 1)
         .or_else(|| std::env::var("DB_PATH").ok())
         .unwrap_or_else(|| "bitwarden.db".to_string());
 
-    // Bind address: arg[2] atau env HOST + PORT, atau env BIND_ADDR, atau default
-    let bind_addr = if let Some(addr) = parse_arg(&args, 2) {
+    // Bind address: pos arg[2] atau env HOST + PORT, atau env BIND_ADDR, atau default
+    let bind_addr = if let Some(addr) = positional_arg(&args, 2) {
         addr
     } else if let Ok(addr) = std::env::var("BIND_ADDR") {
         addr
     } else {
         let host = std::env::var("HOST").unwrap_or_else(|_| "0.0.0.0".to_string());
-        let port = std::env::var("PORT").unwrap_or_else(|_| "8080".to_string());
+        let port = std::env::var("PORT").unwrap_or_else(|_| "8081".to_string());
         format!("{}:{}", host, port)
     };
 
-    // JWT secret: arg[3] atau env JWT_SECRET atau auto-generate
-    let jwt_secret = if let Some(secret) = parse_arg(&args, 3) {
+    // JWT secret: pos arg[3] atau env JWT_SECRET atau auto-generate
+    let jwt_secret = if let Some(secret) = positional_arg(&args, 3) {
         secret
     } else if let Ok(secret) = std::env::var("JWT_SECRET") {
         secret
@@ -44,10 +57,6 @@ async fn main() {
         log::info!("No JWT secret provided, using auto-generated secret");
         secret
     };
-
-    fn parse_arg(args: &[String], pos: usize) -> Option<String> {
-        args.get(pos).map(|s| s.to_string())
-    }
 
     let database = db::Database::open(Path::new(&db_path)).expect("Failed to open database");
     log::info!("Database opened at: {}", db_path);

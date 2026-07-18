@@ -236,19 +236,26 @@ pub struct RegisterRequest {
 pub struct LoginRequest {
     pub username: String,
     pub password: String,
-    pub device: Option<DeviceInfo>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DeviceInfo {
-    #[serde(rename = "deviceIdentifier")]
-    pub device_identifier: String,
-    #[serde(rename = "deviceName")]
-    pub device_name: String,
-    #[serde(rename = "deviceType")]
-    pub device_type: String,
-    #[serde(rename = "pushToken")]
+    #[serde(default)]
+    pub grant_type: Option<String>,
+    #[serde(default)]
+    pub scope: Option<String>,
+    #[serde(default)]
+    pub client_id: Option<String>,
+    #[serde(default, rename = "deviceType")]
+    pub device_type: Option<i32>,
+    #[serde(default, rename = "deviceIdentifier")]
+    pub device_identifier: Option<String>,
+    #[serde(default, rename = "deviceName")]
+    pub device_name: Option<String>,
+    #[serde(default, rename = "pushToken")]
     pub push_token: Option<String>,
+    #[serde(default, rename = "twoFactorToken")]
+    pub two_factor_token: Option<String>,
+    #[serde(default, rename = "twoFactorProvider")]
+    pub two_factor_provider: Option<i32>,
+    #[serde(default, rename = "authRequestToken")]
+    pub auth_request_token: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

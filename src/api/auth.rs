@@ -2,7 +2,7 @@ use axum::{
     extract::State,
     http::StatusCode,
     routing::post,
-    Json, Router,
+    Form, Json, Router,
 };
 
 use crate::api::{create_token, SharedState, UserId};
@@ -84,9 +84,10 @@ async fn handle_register(
 }
 
 /// POST /identity/connect/token
+/// Bitwarden client sends x-www-form-urlencoded
 async fn handle_login(
     State(state): State<SharedState>,
-    Json(req): Json<LoginRequest>,
+    Form(req): Form<LoginRequest>,
 ) -> Result<Json<LoginResponse>, (StatusCode, Json<ErrorResponse>)> {
     let account = state
         .db

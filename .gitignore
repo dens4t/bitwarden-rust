@@ -4,3 +4,6 @@
 *.db-wal
 *.db-shm
 .env
+
+# Auto-generated
+--help
