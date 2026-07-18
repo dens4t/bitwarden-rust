@@ -60,14 +60,57 @@ cp target/release/bitwarden-rs /usr/local/bin/
 ### 3. Jalankan
 
 ```bash
-# Default (database: bitwarden.db, port: 8080)
+# Default (database: bitwarden.db, host: 0.0.0.0, port: 8080)
+bitwarden-rs
+```
+
+#### ⚙️ Konfigurasi Fleksibel
+
+**Priority:** CLI args > Environment variables > Defaults
+
+**A. Via CLI Arguments**
+```bash
+# Format: bitwarden-rs [DB_PATH] [BIND_ADDR] [JWT_SECRET]
+
+bitwarden-rs                    # Default: bitwarden.db :8080
+bitwarden-rs /data/db           # Custom DB path
+bitwarden-rs /data/db 127.0.0.1:9090   # Custom DB + IP:Port
+bitwarden-rs /data/db 0.0.0.0:443 key  # Custom semua
+```
+
+**B. Via Environment Variables**
+```bash
+# Host & port terpisah
+export HOST=127.0.0.1
+export PORT=3000
 bitwarden-rs
 
-# Custom path & port
-bitwarden-rs /data/bitwarden.db 0.0.0.0:3000
+# Bind address langsung
+export BIND_ADDR=0.0.0.0:8080
+bitwarden-rs
 
-# Custom JWT secret
-bitwarden-rs db 0.0.0.0:443 my-secret-key
+# Database path
+export DB_PATH=/data/bitwarden.db
+bitwarden-rs
+
+# JWT Secret (32 karakter random)
+export JWT_SECRET=your-secret-key-here
+bitwarden-rs
+
+# Semua env var sekaligus
+HOST=0.0.0.0 PORT=9090 DB_PATH=/data/db bitwarden-rs
+```
+
+**C. Contoh Kombinasi**
+```bash
+# Hanya ganti port (env var)
+PORT=3000 bitwarden-rs
+
+# Hanya bind ke localhost (env var)
+HOST=127.0.0.1 bitwarden-rs
+
+# Ganti port via CLI, DB via env
+DB_PATH=/data/db bitwarden-rs 0.0.0.0:9090
 ```
 
 ### 4. Konfigurasi Client Bitwarden
@@ -113,7 +156,10 @@ After=network.target
 
 [Service]
 Type=simple
-ExecStart=/usr/local/bin/bitwarden-rs /var/lib/bitwarden-rs/db 0.0.0.0:8080
+Environment=HOST=0.0.0.0
+Environment=PORT=8080
+Environment=DB_PATH=/var/lib/bitwarden-rs/bitwarden.db
+ExecStart=/usr/local/bin/bitwarden-rs
 WorkingDirectory=/var/lib/bitwarden-rs
 Restart=on-failure
 RestartSec=5s
@@ -125,6 +171,21 @@ EOF
 
 systemctl daemon-reload
 systemctl enable --now bitwarden-rs
+```
+
+### Mengganti Port / IP
+
+```bash
+# Edit service
+systemctl edit bitwarden-rs
+
+# Tambahkan:
+[Service]
+Environment=HOST=127.0.0.1
+Environment=PORT=3000
+
+# Restart
+systemctl restart bitwarden-rs
 ```
 
 ## 🛠️ Struktur Proyek
