@@ -1,0 +1,146 @@
+name: Build & Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag name for release'
+        required: false
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: full
+
+jobs:
+  build:
+    name: Build (${{ matrix.target }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+            suffix: ""
+            archive: tar.gz
+          - target: x86_64-unknown-linux-musl
+            os: ubuntu-latest
+            suffix: "-musl"
+            archive: tar.gz
+          - target: aarch64-unknown-linux-gnu
+            os: ubuntu-latest
+            suffix: "-arm64"
+            archive: tar.gz
+          - target: x86_64-pc-windows-gnu
+            os: ubuntu-latest
+            suffix: "-windows.exe"
+            archive: zip
+          - target: x86_64-apple-darwin
+            os: macos-latest
+            suffix: "-macos"
+            archive: tar.gz
+          - target: aarch64-apple-darwin
+            os: macos-latest
+            suffix: "-macos-arm64"
+            archive: tar.gz
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          target: ${{ matrix.target }}
+
+      - name: Install cross-compilation dependencies (Linux)
+        if: contains(matrix.target, 'linux')
+        run: |
+          sudo apt-get update
+          if [[ "${{ matrix.target }}" == "aarch64-unknown-linux-gnu" ]]; then
+            sudo apt-get install -y gcc-aarch64-linux-gnu
+          fi
+          if [[ "${{ matrix.target }}" == "x86_64-unknown-linux-musl" ]]; then
+            sudo apt-get install -y musl-tools
+          fi
+          if [[ "${{ matrix.target }}" == "x86_64-pc-windows-gnu" ]]; then
+            sudo apt-get install -y mingw-w64
+          fi
+
+      - name: Build release
+        run: |
+          cargo build --release --target ${{ matrix.target }}
+          echo "Binary size: $(du -sh target/${{ matrix.target }}/release/bitwarden-rs* 2>/dev/null)"
+
+      - name: Prepare archive
+        shell: bash
+        run: |
+          mkdir -p dist
+          BINARY="target/${{ matrix.target }}/release/bitwarden-rs${{ matrix.suffix == '-windows.exe' && '.exe' || '' }}"
+          if [ -f "$BINARY" ]; then
+            if [[ "${{ matrix.archive }}" == "zip" ]]; then
+              cd dist
+              cp "../$BINARY" "bitwarden-rs${{ matrix.suffix }}"
+              zip "bitwarden-rs-${{ matrix.target }}.zip" "bitwarden-rs${{ matrix.suffix }}"
+              cd ..
+            else
+              tar -czf "dist/bitwarden-rs-${{ matrix.target }}.tar.gz" -C "$(dirname "$BINARY")" "$(basename "$BINARY")"
+            fi
+          fi
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: bitwarden-rs-${{ matrix.target }}
+          path: dist/*
+
+  create-release:
+    name: Create Release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/**/*
+          generate_release_notes: true
+          body: |
+            ## 🚀 Bitwarden-rs Release
+
+            ### 📦 Binary Downloads
+
+            | Platform | File |
+            |----------|------|
+            | Linux x86_64 | `bitwarden-rs-x86_64-unknown-linux-gnu.tar.gz` |
+            | Linux x86_64 (static musl) | `bitwarden-rs-x86_64-unknown-linux-musl.tar.gz` |
+            | Linux ARM64 (Raspberry Pi) | `bitwarden-rs-aarch64-unknown-linux-gnu.tar.gz` |
+            | Windows x86_64 | `bitwarden-rs-x86_64-pc-windows-gnu.zip` |
+            | macOS x86_64 | `bitwarden-rs-x86_64-apple-darwin.tar.gz` |
+            | macOS Apple Silicon | `bitwarden-rs-aarch64-apple-darwin.tar.gz` |
+
+            ### ⚡ Cara Install
+
+            ```bash
+            # Linux
+            tar -xzf bitwarden-rs-x86_64-unknown-linux-gnu.tar.gz
+            chmod +x bitwarden-rs
+            sudo mv bitwarden-rs /usr/local/bin/
+
+            # Windows
+            # Extract zip and run bitwarden-rs.exe
+
+            # macOS
+            tar -xzf bitwarden-rs-x86_64-apple-darwin.tar.gz
+            chmod +x bitwarden-rs
+            sudo mv bitwarden-rs /usr/local/bin/
+            ```
