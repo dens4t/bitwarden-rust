@@ -12,6 +12,7 @@ use crate::models::*;
 pub fn routes() -> Router<SharedState> {
     Router::new()
         .route("/api/accounts/register", post(handle_register))
+        .route("/api/accounts/register/send-verification-email", post(handle_send_verification_email))
         .route("/identity/connect/token", post(handle_login))
         .route("/api/accounts/prelogin", post(handle_prelogin))
         .route("/api/two-factor/get-authenticator", post(handle_get_authenticator))
@@ -34,6 +35,12 @@ async fn handle_prelogin(
         kdf,
         kdf_iterations,
     })
+}
+
+/// POST /api/accounts/register/send-verification-email
+/// Bitwarden extension calls this after registration; we stub it.
+async fn handle_send_verification_email() -> &'static str {
+    ""
 }
 
 /// POST /api/accounts/register

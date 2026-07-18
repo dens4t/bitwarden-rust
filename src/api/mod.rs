@@ -128,6 +128,10 @@ pub async fn auth_middleware(
     mut req: Request,
     next: Next,
 ) -> Response {
+    let method = req.method().to_string();
+    let path = req.uri().path().to_string();
+    log::info!("▶ {} {}", method, path);
+
     let auth_header = req
         .headers()
         .get(AUTHORIZATION)

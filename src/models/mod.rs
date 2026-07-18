@@ -42,7 +42,7 @@ pub struct Profile {
     #[serde(rename = "twoFactorEnabled")]
     pub two_factor_enabled: bool,
     pub key: String,
-    #[serde(rename = "privateKey")]
+    #[serde(rename = "PrivateKey")]
     pub private_key: String,
     #[serde(rename = "securityStamp")]
     pub security_stamp: Option<String>,
