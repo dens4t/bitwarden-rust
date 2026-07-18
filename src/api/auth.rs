@@ -75,9 +75,11 @@ async fn handle_register(
         "id": account.id,
         "token": token,
         "Key": account.key,
-        "privateKey": account.keys.encrypted_private_key,
+        "PrivateKey": account.keys.encrypted_private_key,
         "Kdf": account.kdf,
         "KdfIterations": account.kdf_iterations,
+        "object": "register",
+        "resetMasterPassword": false,
     })))
 }
 

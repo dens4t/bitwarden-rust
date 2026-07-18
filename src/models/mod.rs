@@ -260,7 +260,7 @@ pub struct LoginResponse {
     pub refresh_token: String,
     #[serde(rename = "Key")]
     pub key: Option<String>,
-    #[serde(rename = "privateKey")]
+    #[serde(rename = "PrivateKey")]
     pub private_key: Option<String>,
     #[serde(rename = "Kdf")]
     pub kdf: Option<i32>,
